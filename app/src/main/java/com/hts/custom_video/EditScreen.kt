@@ -45,8 +45,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.core.net.toUri
 import androidx.navigation.compose.rememberNavController
+import com.hts.custom_video.components.DraggableBox
 import compose.icons.FeatherIcons
+import compose.icons.feathericons.Pause
+import compose.icons.feathericons.PauseCircle
 import compose.icons.feathericons.Play
+import compose.icons.feathericons.PlayCircle
 import kotlinx.coroutines.delay
 
 @OptIn(UnstableApi::class)
@@ -78,31 +82,7 @@ fun EditScreen(videoUri: String) {
             buildHeading()
             // Video Player
             buildCustomPlayer(videoUri)
-//            Box(
-//                modifier = Modifier
-//                    .fillMaxWidth()
-//                    .height((screenHeight / 2.5).dp)
-//                    .aspectRatio(16f / 9f)
-//                    .background(Color.Black),
-//                contentAlignment = Alignment.Center
-//            ) {
-//                if (isLoading) {
-//                    CircularProgressIndicator(color = Color.White)
-//                } else {
-//                    AndroidView(
-//                        factory = { ctx ->
-//                            PlayerView(ctx).apply {
-//                                player = exoPlayer
-//                                useController = false
-//                                setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-//                            }
-//                        },
-//                        modifier = Modifier.fillMaxSize()
-//                    )
-//                }
-//            }
-
-            VideoThumbnails(
+            buildVideoThumbnails(
                 videoUrl = videoUri,
                 thumbnails = thumbnails,
                 durations = durations,
@@ -176,7 +156,6 @@ fun buildCustomPlayer(videoUri: String) {
         exoPlayer.setMediaItem(MediaItem.fromUri(videoUri))
         exoPlayer.prepare()
         isLoading = false
-        exoPlayer.play()
     }
 
     DisposableEffect(Unit) {
@@ -196,7 +175,7 @@ fun buildCustomPlayer(videoUri: String) {
         if (isLoading) {
             CircularProgressIndicator(color = Color.White)
         } else {
-            Surface( modifier = Modifier.aspectRatio(16f / 9f),) {
+            Surface(modifier = Modifier.aspectRatio(16f / 9f)) {
                 AndroidView(
                     factory = { ctx ->
                         PlayerView(ctx).apply {
@@ -205,13 +184,16 @@ fun buildCustomPlayer(videoUri: String) {
                             setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
                         }
                     },
-                    modifier = Modifier.fillMaxSize().aspectRatio(16f / 9f)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .aspectRatio(16f / 9f)
                 )
                 buildVideoOverlay(exoPlayer, videoSize)
             }
         }
     }
 }
+
 @Composable
 fun buildVideoOverlay(exoPlayer: ExoPlayer, videoSize: Size) {
     val isPlaying = remember { mutableStateOf(exoPlayer.isPlaying) }
@@ -221,14 +203,11 @@ fun buildVideoOverlay(exoPlayer: ExoPlayer, videoSize: Size) {
     LaunchedEffect(exoPlayer.isPlaying) {
         isPlaying.value = exoPlayer.isPlaying
     }
-
-    // Tự động ẩn nút sau 2s
-    LaunchedEffect(showButton.value) {
-        if (showButton.value) {
-            delay(2000)
-            showButton.value = false
-        }
-    }
+    // Lần đầu vào thì sẽ hiển thị nút, not play
+    // khi bấm vào nút thì play, âẩn đi nút, playing
+    // khi đang chạy video ( không hiển thị gì ) -> bấm vào video -> hiển thị nút pause
+    //  nếu sau đó bấm pause -> hiển thị nút play
+    //  nếu sau 1.5s mà ko bấm -> ẩn nút đi
 
     Box(
         modifier = Modifier
@@ -236,14 +215,7 @@ fun buildVideoOverlay(exoPlayer: ExoPlayer, videoSize: Size) {
             .height(videoSize.height.dp)
             .background(Color.Transparent)
             .clickable {
-                if (exoPlayer.isPlaying) {
-                    exoPlayer.pause()
-                    isPlaying.value = false
-                } else {
-                    exoPlayer.play()
-                    isPlaying.value = true
-                }
-                showButton.value = true
+                showButton.value = !showButton.value
             },
         contentAlignment = Alignment.Center
     ) {
@@ -253,20 +225,29 @@ fun buildVideoOverlay(exoPlayer: ExoPlayer, videoSize: Size) {
             exit = fadeOut(tween(300)) + scaleOut(tween(300))
         ) {
             Icon(
-                imageVector = if (isPlaying.value) FeatherIcons.Play else FeatherIcons.Play,
+                imageVector = if (isPlaying.value) FeatherIcons.PauseCircle else FeatherIcons.PlayCircle,
                 contentDescription = null,
                 tint = Color.White,
                 modifier = Modifier
                     .size(64.dp)
                     .background(Color.Black.copy(alpha = 0.4f), shape = CircleShape)
                     .padding(12.dp)
+                    .clickable {
+                        if (isPlaying.value) {
+                            isPlaying.value = false
+                            exoPlayer.pause()
+                        } else {
+                            isPlaying.value = true
+                            exoPlayer.play()
+                        }
+                    }
             )
         }
     }
 }
 
 @Composable
-fun VideoThumbnails(
+fun buildVideoThumbnails(
     videoUrl: String,
     thumbnails: List<Bitmap>,
     durations: Long,
@@ -308,9 +289,13 @@ fun VideoThumbnails(
         modifier = Modifier
             .fillMaxWidth()
             .height(80.dp)
-            .padding(8.dp)
     ) {
-        Row {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(80.dp)
+                .padding(horizontal = 40.dp)
+        ) {
             thumbnails.forEach {
                 Image(
                     bitmap = it.asImageBitmap(),
@@ -321,6 +306,7 @@ fun VideoThumbnails(
                 )
             }
         }
+        DraggableBox()
     }
 }
 
