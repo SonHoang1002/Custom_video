@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,6 +26,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -47,11 +46,8 @@ import androidx.core.net.toUri
 import androidx.navigation.compose.rememberNavController
 import com.hts.custom_video.components.DraggableBox
 import compose.icons.FeatherIcons
-import compose.icons.feathericons.Pause
 import compose.icons.feathericons.PauseCircle
-import compose.icons.feathericons.Play
 import compose.icons.feathericons.PlayCircle
-import kotlinx.coroutines.delay
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -254,6 +250,7 @@ fun buildVideoThumbnails(
     setThumbnails: (List<Bitmap>) -> Unit,
     setDurations: (Long) -> Unit
 ) {
+    val seekBarHeight = 50
     val localContext = LocalContext.current
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
@@ -288,12 +285,11 @@ fun buildVideoThumbnails(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(80.dp)
+            .height(seekBarHeight.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(80.dp)
                 .padding(horizontal = 40.dp)
         ) {
             thumbnails.forEach {
@@ -302,11 +298,12 @@ fun buildVideoThumbnails(
                     contentDescription = null,
                     modifier = Modifier
                         .width(screenWidth / 9)
-                        .height(100.dp)
+                        .height(seekBarHeight.dp),
+                    contentScale = ContentScale.Crop
                 )
             }
         }
-        DraggableBox()
+        DraggableBox(seekBarHeight)
     }
 }
 
