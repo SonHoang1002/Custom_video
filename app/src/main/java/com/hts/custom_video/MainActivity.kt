@@ -2,40 +2,53 @@ package com.hts.custom_video
 
 import EditScreen
 import ImportOptionItem
-import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.OptIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.media3.common.util.Log
+import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavController
 import androidx.navigation.NavHostController
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
+import com.hts.custom_video.ViewModel.MyViewModel
 import com.hts.custom_video.ui.theme.Custom_videoTheme
+import kotlinx.coroutines.delay
 
+
+val TAG = "Main"
 sealed class Screen(val route: String) {
     object Main : Screen("main")
     object Player : Screen("player/{videoUri}") {
@@ -52,7 +65,6 @@ class MainActivity : ComponentActivity() {
         // Trong NavHost của bạn
 
         setContent {
-
             Custom_videoTheme {
                 val navController = rememberNavController()
                 VideoAppNavHost(navController)
@@ -68,37 +80,37 @@ fun VideoAppNavHost(navController: NavHostController) {
         startDestination = "main",
         modifier = Modifier.fillMaxSize()
     ) {
+        val myViewModel = MyViewModel()
         // Màn hình chính
         composable("main") {
                 MainScreen(
                     navController = navController,
                     name = "Android",
+                    myViewModel = myViewModel
                 )
         }
 
         composable(
             route = "player/{videoUri}",
-            arguments = listOf(navArgument("videoUri") { type = NavType.StringType })
+//            arguments = listOf(navArgument("videoUri") { type = NavType.StringType })
         ) { backStackEntry ->
-            val videoUri = backStackEntry.arguments?.getString("videoUri")
-            EditScreen(videoUri = videoUri!!)
+            EditScreen(
+                myViewModel = myViewModel,
+            )
         }
 
     }
 }
 
 @Composable
-fun MainScreen(navController : NavController,  name: String) {
+fun MainScreen(navController: NavController, name: String, myViewModel: MyViewModel) {
     val context = LocalContext.current
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
         onResult = { uri ->
             uri?.let {
                 try {
-//                    context.contentResolver.takePersistableUriPermission(
-//                        it,
-//                        Intent.FLAG_GRANT_READ_URI_PERMISSION
-//                    )
+                    myViewModel.setVideoUri(uri.toString())
                     navController.navigate(Screen.Player.createRoute(it.toString()))
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -113,6 +125,7 @@ fun MainScreen(navController : NavController,  name: String) {
         onResult = { uri ->
             uri?.let {
                 try {
+                    myViewModel.setVideoUri(uri.toString())
                     navController.navigate(Screen.Player.createRoute(it.toString()))
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -126,20 +139,21 @@ fun MainScreen(navController : NavController,  name: String) {
         Box(
             modifier = Modifier
                 .padding(innerPadding)
-                .fillMaxSize()
+
         ) {
             Column(
                 verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxSize()
             ) {
                 Text(
                     text = "Hello ",
                 )
+
                 Row(
                     horizontalArrangement = Arrangement.Center,
                     modifier = Modifier
-                        .padding()
-                        .fillMaxSize(),
+                        .padding().fillMaxSize(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     ImportOptionItem(
@@ -148,8 +162,9 @@ fun MainScreen(navController : NavController,  name: String) {
                         onTap = {
                             filePickerLauncher.launch(arrayOf("video/*"))
                         },
+                        painterId = R.drawable.ic_launcher_background,
                         iconColor = Color.White,
-                        textColor = Color.White
+                        textColor = Color.White,
                     )
                     Box(modifier = Modifier.width(16.dp))
 
@@ -159,24 +174,74 @@ fun MainScreen(navController : NavController,  name: String) {
                         onTap = {
                             galleryLauncher.launch("video/*")
                         },
+                        painterId = R.drawable.ic_launcher_background,
                         iconColor = Color.White,
                         textColor = Color.White
                     )
 
                 }
-                Text(
-                    text = "Hello $name!",
-                )
+//                EffectsDemo()
             }
         }
     }
 }
 
-@Preview(showBackground = true)
+//@Preview(showBackground = true)
+//@Composable
+//fun GreetingPreview() {
+//    Custom_videoTheme {
+//        val navController = rememberNavController()
+//        MainScreen(navController, "Android",)
+//    }
+//}
+
+@OptIn(UnstableApi::class)
 @Composable
-fun GreetingPreview() {
-    Custom_videoTheme {
-        val navController = rememberNavController()
-        MainScreen(navController, "Android")
+fun EffectsDemo() {
+    val counter = remember { mutableStateOf(0) }
+    val context = LocalContext.current
+
+
+    // LaunchedEffect ~ useEffect với dependency
+    LaunchedEffect(key1 = counter.value) {
+         Log.d(TAG, "LaunchedEffect triggered by counter change")
+        delay(500)
+        Toast.makeText(context, "LaunchedEffect: Counter = ${counter.value}", Toast.LENGTH_SHORT).show()
+    }
+
+    // DisposableEffect ~ useEffect có cleanup
+    DisposableEffect(key1 = counter) {
+        Log.d(TAG, "DisposableEffect started with counter = ${counter.value}")
+        onDispose {
+            Log.d(TAG, "DisposableEffect cleaned up with counter = ${counter.value}")
+        }
+    }
+
+    // DerivedStateOf giống useMemo
+    val derivedMessage by remember {
+        derivedStateOf {
+            "Derived message from counter: ${counter.value * 10}"
+        }
+    }
+
+    // SnapshotFlow ~ useEffect + state changes (dòng chảy giá trị)
+    LaunchedEffect(Unit) {
+        snapshotFlow { counter.value }
+            .collect { value ->
+                Log.d(TAG, "snapshotFlow observed: $value")
+            }
+    }
+
+    Column(
+        modifier = Modifier
+            .size(200.dp)
+            .padding(16.dp)
+    ) {
+        Text("Counter: ${counter.value}")
+        Text("Derived: $derivedMessage")
+
+        Button(onClick = { counter.value++ }) {
+            Text("Increase")
+        }
     }
 }

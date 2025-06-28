@@ -1,5 +1,6 @@
+import android.annotation.SuppressLint
 import android.graphics.Bitmap
-import android.media.MediaMetadataRetriever
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -8,17 +9,38 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Send
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -26,60 +48,57 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.common.*
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import androidx.core.net.toUri
 import androidx.navigation.compose.rememberNavController
-import com.hts.custom_video.components.DraggableBox
+import com.hts.custom_video.ViewModel.MyViewModel
+import com.hts.custom_video.components.BuildVideoThumbnails
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.PauseCircle
 import compose.icons.feathericons.PlayCircle
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
+@SuppressLint("ConfigurationScreenWidthHeight")
 @OptIn(UnstableApi::class)
 @Composable
-fun EditScreen(videoUri: String) {
+fun EditScreen(myViewModel: MyViewModel) {
     val context = LocalContext.current
-//    val exoPlayer = remember { ExoPlayer.Builder(context).build() }
+    val exoPlayer = remember { ExoPlayer.Builder(context).build() }
     var thumbnails by remember { mutableStateOf<List<Bitmap>>(emptyList()) }
-    var durations by remember { mutableStateOf(0L) }
-//    var isLoading by remember { mutableStateOf(true) }
-//    val configuration = LocalConfiguration.current
-//    val screenWidth = configuration.screenWidthDp.dp
-//    val screenHeight = configuration.screenHeightDp
-//    LaunchedEffect(videoUri) {
-//        exoPlayer.setMediaItem(MediaItem.fromUri(videoUri))
-//        exoPlayer.prepare()
-//        isLoading = false
-//    }
-//
-//    DisposableEffect(Unit) {
-//        onDispose {
-//            exoPlayer.release()
-//            thumbnails?.forEach { it.recycle() }
-//        }
-//    }
+    var durations by remember { mutableLongStateOf(0L) }
+    val configuration = LocalConfiguration.current
+    LaunchedEffect(myViewModel.getVideoUriValue) {
+        exoPlayer.setMediaItem(MediaItem.fromUri(myViewModel.getVideoUriValue))
+        exoPlayer.setPlaybackSpeed(5f)
+        exoPlayer.prepare()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            exoPlayer.release()
+            thumbnails?.forEach { it.recycle() }
+        }
+    }
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding)) {
-            buildHeading()
-            // Video Player
-            buildCustomPlayer(videoUri)
-            buildVideoThumbnails(
-                videoUrl = videoUri,
+            BuildHeading()
+            BuildCustomPlayer(exoPlayer = exoPlayer)
+            BuildVideoThumbnails(
+                myViewModel = myViewModel,
+                exoPlayer,
                 thumbnails = thumbnails,
                 durations = durations,
                 setThumbnails = { thumbnails = it },
@@ -90,13 +109,13 @@ fun EditScreen(videoUri: String) {
 }
 
 @Composable
-fun buildHeading() {
+fun BuildHeading() {
     val navController = rememberNavController()
     Row(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .padding(horizontal = 20.dp)
+//            .padding(horizontal = 20.dp)
             .fillMaxWidth()
             .size(50.dp)
             .background(Color.Black),
@@ -107,7 +126,7 @@ fun buildHeading() {
         ) {
             IconButton(
                 onClick = {
-                    navController.clearBackStack<Unit>()
+                    navController.popBackStack()
                 }
             ) {
                 Icon(
@@ -122,7 +141,6 @@ fun buildHeading() {
                 color = Color.Red,
                 modifier = Modifier
             )
-
         }
         IconButton(
             onClick = {
@@ -139,26 +157,13 @@ fun buildHeading() {
     }
 }
 
+@SuppressLint("ConfigurationScreenWidthHeight")
 @OptIn(UnstableApi::class)
 @Composable
-fun buildCustomPlayer(videoUri: String) {
-    val context = LocalContext.current
-    val exoPlayer = remember { ExoPlayer.Builder(context).build() }
-    var isLoading by remember { mutableStateOf(true) }
+fun BuildCustomPlayer(exoPlayer: ExoPlayer) {
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
     val videoSize = Size(screenWidth.value, screenWidth.value)
-    LaunchedEffect(videoUri) {
-        exoPlayer.setMediaItem(MediaItem.fromUri(videoUri))
-        exoPlayer.prepare()
-        isLoading = false
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            exoPlayer.release()
-        }
-    }
 
     Box(
         modifier = Modifier
@@ -168,9 +173,6 @@ fun buildCustomPlayer(videoUri: String) {
             .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
-        if (isLoading) {
-            CircularProgressIndicator(color = Color.White)
-        } else {
             Surface(modifier = Modifier.aspectRatio(16f / 9f)) {
                 AndroidView(
                     factory = { ctx ->
@@ -184,26 +186,39 @@ fun buildCustomPlayer(videoUri: String) {
                         .fillMaxSize()
                         .aspectRatio(16f / 9f)
                 )
-                buildVideoOverlay(exoPlayer, videoSize)
+                BuildVideoOverlay(exoPlayer, videoSize)
             }
-        }
+
     }
 }
 
 @Composable
-fun buildVideoOverlay(exoPlayer: ExoPlayer, videoSize: Size) {
+fun BuildVideoOverlay(exoPlayer: ExoPlayer, videoSize: Size) {
     val isPlaying = remember { mutableStateOf(exoPlayer.isPlaying) }
     val showButton = remember { mutableStateOf(true) }
+    val coroutineScope = rememberCoroutineScope()
 
-    // Để trigger UI khi trạng thái thay đổi bên ngoài ExoPlayer
-    LaunchedEffect(exoPlayer.isPlaying) {
-        isPlaying.value = exoPlayer.isPlaying
+    // Lắng nghe thay đổi trạng thái từ ExoPlayer
+    DisposableEffect(exoPlayer) {
+        val listener = object : Player.Listener {
+            override fun onIsPlayingChanged(isPlayingNow: Boolean) {
+                isPlaying.value = isPlayingNow
+            }
+
+            override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_ENDED) {
+                    isPlaying.value = false
+                    showButton.value = true
+                }
+            }
+        }
+
+        exoPlayer.addListener(listener)
+
+        onDispose {
+            exoPlayer.removeListener(listener)
+        }
     }
-    // Lần đầu vào thì sẽ hiển thị nút, not play
-    // khi bấm vào nút thì play, âẩn đi nút, playing
-    // khi đang chạy video ( không hiển thị gì ) -> bấm vào video -> hiển thị nút pause
-    //  nếu sau đó bấm pause -> hiển thị nút play
-    //  nếu sau 1.5s mà ko bấm -> ẩn nút đi
 
     Box(
         modifier = Modifier
@@ -230,80 +245,27 @@ fun buildVideoOverlay(exoPlayer: ExoPlayer, videoSize: Size) {
                     .padding(12.dp)
                     .clickable {
                         if (isPlaying.value) {
-                            isPlaying.value = false
                             exoPlayer.pause()
                         } else {
-                            isPlaying.value = true
+                            Log.d("BuildVideoOverlay", "BuildVideoOverlay: currentPosition = ${exoPlayer.currentPosition}, duration = ${exoPlayer.duration}")
+                            if (exoPlayer.currentPosition >= exoPlayer.duration) {
+                                exoPlayer.seekTo(0L)
+                            }
                             exoPlayer.play()
+                        }
+
+                        isPlaying.value = exoPlayer.isPlaying
+
+                        // Tự động ẩn nút sau 1.5s nếu đang phát
+                        if (exoPlayer.isPlaying) {
+                            coroutineScope.launch {
+                                delay(1500)
+                                showButton.value = false
+                            }
                         }
                     }
             )
         }
-    }
-}
-
-@Composable
-fun buildVideoThumbnails(
-    videoUrl: String,
-    thumbnails: List<Bitmap>,
-    durations: Long,
-    setThumbnails: (List<Bitmap>) -> Unit,
-    setDurations: (Long) -> Unit
-) {
-    val seekBarHeight = 50
-    val localContext = LocalContext.current
-    val configuration = LocalConfiguration.current
-    val screenWidth = configuration.screenWidthDp.dp
-
-    LaunchedEffect(videoUrl) {
-        withContext(Dispatchers.IO) {
-            val metadata = MediaMetadataRetriever()
-            metadata.setDataSource(localContext, videoUrl.toUri())
-
-            // Lấy duration
-            val durationMs =
-                metadata.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLong()
-                    ?: 0L
-            withContext(Dispatchers.Main) {
-                setDurations(durationMs)
-            }
-
-            // Lấy thumbnails
-            val newThumbnails = (0..8).mapNotNull { i ->
-                val timeUs = (durationMs * i / 8) * 1000
-                metadata.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-            }
-
-            withContext(Dispatchers.Main) {
-                setThumbnails(newThumbnails)
-            }
-
-            metadata.release()
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(seekBarHeight.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 40.dp)
-        ) {
-            thumbnails.forEach {
-                Image(
-                    bitmap = it.asImageBitmap(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .width(screenWidth / 9)
-                        .height(seekBarHeight.dp),
-                    contentScale = ContentScale.Crop
-                )
-            }
-        }
-        DraggableBox(seekBarHeight)
     }
 }
 
@@ -316,7 +278,6 @@ fun VideoSeekBar(
 ) {
     var dragStart by remember { mutableStateOf<Offset?>(null) }
     var dragEnd by remember { mutableStateOf<Offset?>(null) }
-    val density = LocalDensity.current
 
     Box(modifier = modifier) {
         Canvas(

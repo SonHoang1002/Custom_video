@@ -2,6 +2,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
+    id("org.jetbrains.kotlin.plugin.compose") version "2.2.0"
 }
 
 android {
@@ -51,6 +52,7 @@ android {
 }
 
 dependencies {
+    implementation(libs.compose.shimmer)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.font.awesome)
     implementation(libs.feather)
